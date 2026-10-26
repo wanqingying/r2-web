@@ -11,12 +11,12 @@
   "r2_buckets": [
     {
       "binding": "BUCKET",
-      "bucket_name": "your-bucket"
+      "bucket_name": "personal"
     }
   ],
   "vars": {
-    "R2_ACCOUNT_ID": "your-account-id",
-    "R2_BUCKET": "your-bucket",
+    "R2_ACCOUNT_ID": "12fe5338781939c4d1929577bb948f4f",
+    "R2_BUCKET": "personal",
     "R2_CUSTOM_DOMAIN": ""
   }
 }
