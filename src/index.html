@@ -144,6 +144,7 @@
 
             <!-- Tab 2: R2 Config -->
             <form class="config-tab-panel" role="tabpanel" data-panel="r2" hidden>
+              <p class="text-secondary" id="r2-managed-note" hidden></p>
               <div class="config-section">
                 <div class="field">
                   <div class="field-label">
@@ -400,6 +401,20 @@
     </dialog>
 
     <!-- Hero (shown when not connected) -->
+    <section id="auth-gate" hidden>
+      <form id="auth-form" class="auth-card" autocomplete="on">
+        <img src="favicon.ico" alt="" class="auth-logo" />
+        <h1 class="auth-title" id="auth-title">需要访问权限</h1>
+        <p class="auth-desc" id="auth-desc">此站点已启用访问控制，请输入访问密码。</p>
+        <label class="auth-field">
+          <span class="sr-only" id="auth-label">访问密码</span>
+          <input id="auth-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="auth-error" id="auth-error" hidden></p>
+        <button type="submit" class="btn primary auth-submit" id="auth-submit">进入</button>
+      </form>
+    </section>
+
     <section id="hero" hidden>
       <div class="hero-inner">
         <div class="hero-badge">

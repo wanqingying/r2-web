@@ -224,7 +224,7 @@ class FileExplorer {
         this.#ui.toast(t(/** @type {any} */ (errorKey)), 'error')
       }
 
-      if (err.message === 'HTTP_401' || err.message === 'HTTP_403') {
+      if (err.message === 'HTTP_401' || err.message === 'HTTP_403' || err.message === 'SESSION_EXPIRED') {
         throw err
       }
     }

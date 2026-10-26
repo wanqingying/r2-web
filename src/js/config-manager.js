@@ -2,8 +2,25 @@ import { STORAGE_KEY, THEME_KEY, LANG_KEY, VIEW_KEY, DENSITY_KEY, SORT_BY_KEY, S
 
 /** @typedef {{ accountId?: string; accessKeyId?: string; secretAccessKey?: string; bucket?: string; filenameTpl?: string; filenameTplScope?: string; customDomain?: string; bucketAccess?: 'public' | 'private'; compressMode?: string; compressLevel?: string; tinifyKey?: string; uploadConcurrency?: number }} AppConfig */
 /** @typedef {AppConfig & { theme?: string; lang?: string; view?: string; density?: string; sortBy?: string; sortOrder?: string }} SharePayload */
+/** @typedef {{ accountId: string; bucket: string; customDomain: string | null }} SessionInfo */
 
 class ConfigManager {
+  /** @type {SessionInfo | null} */
+  #session = null
+
+  /** @param {SessionInfo} info */
+  applySession(info) {
+    this.#session = info
+  }
+
+  clearSession() {
+    this.#session = null
+  }
+
+  isWorkerMode() {
+    return !!this.#session
+  }
+
   /** @returns {AppConfig} */
   load() {
     try {
@@ -15,12 +32,25 @@ class ConfigManager {
 
   /** @param {AppConfig} cfg */
   save(cfg) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg))
+    if (!this.#session) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg))
+      return
+    }
+    // Worker mode never persists credentials: the Worker mints them per session.
+    const { accountId, accessKeyId, secretAccessKey, bucket, ...preferences } = cfg
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences))
   }
 
   /** @returns {AppConfig} */
   get() {
-    return this.load()
+    const local = this.load()
+    if (!this.#session) return local
+    return {
+      ...local,
+      accountId: this.#session.accountId,
+      bucket: this.#session.bucket,
+      customDomain: this.#session.customDomain ?? local.customDomain,
+    }
   }
 
   clear() {
@@ -28,17 +58,18 @@ class ConfigManager {
   }
 
   isValid() {
+    if (this.#session) return true
     const c = this.load()
     return !!(c.accountId && c.accessKeyId && c.secretAccessKey && c.bucket)
   }
 
   getEndpoint() {
-    const c = this.load()
+    const c = this.get()
     return `https://${c.accountId}.r2.cloudflarestorage.com`
   }
 
   getBucketUrl() {
-    const c = this.load()
+    const c = this.get()
     return `${this.getEndpoint()}/${c.bucket}`
   }
 

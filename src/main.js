@@ -1,4 +1,4 @@
 import { App } from './js/app.js'
 
 // Boot
-new App()
+await new App().init()

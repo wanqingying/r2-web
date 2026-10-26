@@ -15,6 +15,7 @@ import { FileOperations } from './file-operations.js'
 import { FilePreview } from './file-preview.js'
 import { UploadManager } from './upload-manager.js'
 import { R2Client } from './r2-client.js'
+import { SessionManager } from './session.js'
 import { UIManager } from './ui-manager.js'
 import { getCurrentLang, setLang, t } from './i18n.js'
 import { $, getErrorMessage } from './utils.js'
@@ -42,15 +43,24 @@ class App {
   #batchMode = false
   /** @type {((e: TransitionEvent) => void) | null} */
   #onBarTransitionEnd = null
+  /** @type {SessionManager} */
+  #session
 
   constructor() {
     this.#config = new ConfigManager()
+    this.#session = new SessionManager()
     this.#r2 = new R2Client()
     this.#ui = new UIManager()
 
     this.#ui.initTheme()
     this.#ui.initTooltip()
 
+    this.#bindGlobalEvents()
+    this.#bindHeroEvents()
+    this.#bindAuthEvents()
+  }
+
+  async init() {
     const urlParams = new URLSearchParams(window.location.search)
     const configParam = urlParams.get('config')
     if (configParam) {
@@ -67,17 +77,33 @@ class App {
 
     this.#applyI18nToHTML()
 
+    const state = await this.#session.bootstrap()
+    if (state === 'worker') {
+      this.#config.applySession(/** @type {import('./config-manager.js').SessionInfo} */ (this.#session.info))
+      this.#applyWorkerMode()
+      await this.#connectAndLoad()
+      return
+    }
+
+    if (state === 'login') {
+      const message = this.#session.reason === 'server' ? 'authUnavailable' : null
+      this.#showAuthGate(message ?? (urlParams.get('auth') === 'invalid' ? 'authLinkInvalid' : null))
+      if (urlParams.has('auth')) {
+        const cleanUrl = new URL(window.location.href)
+        cleanUrl.searchParams.delete('auth')
+        window.history.replaceState({}, '', cleanUrl.toString())
+      }
+      return
+    }
+
     if (this.#config.isValid()) {
-      this.#connectAndLoad()
+      await this.#connectAndLoad()
       if (configParam) {
         setTimeout(() => this.#ui.toast(t('configLoadedFromUrl'), 'success'), 500)
       }
     } else {
       this.#showHero()
     }
-
-    this.#bindGlobalEvents()
-    this.#bindHeroEvents()
   }
 
   #applyI18nToHTML() {
@@ -251,6 +277,12 @@ class App {
     $('#share-btn').dataset.tooltip = t('shareConfig')
     $('#settings-btn').dataset.tooltip = t('settings')
     $('#logout-btn').dataset.tooltip = t('logout')
+
+    $('#auth-title').textContent = t('authTitle')
+    $('#auth-desc').textContent = t('authDesc')
+    $('#auth-label').textContent = t('authPassword')
+    $('#auth-submit').textContent = t('authSubmit')
+    $('#r2-managed-note').textContent = t('r2ManagedNote')
     $('#refresh-btn').dataset.tooltip = t('refresh')
     $('#preview-copy-text').dataset.tooltip = t('copyText')
     $('#preview-copy-image').dataset.tooltip = t('copyImage')
@@ -300,7 +332,7 @@ class App {
 
   async #connectAndLoad() {
     try {
-      this.#r2.init(this.#config)
+      this.#r2.init(this.#config, this.#session)
       this.#explorer = new FileExplorer(this.#r2, this.#ui)
       this.#upload = new UploadManager(this.#r2, this.#ui, this.#explorer, this.#config)
       this.#preview = new FilePreview(this.#r2, this.#ui)
@@ -321,6 +353,10 @@ class App {
       }
       await this.#explorer.navigate('')
     } catch (/** @type {any} */ err) {
+      if (this.#session.isWorkerMode() && (err.message === 'SESSION_EXPIRED' || err.message === 'HTTP_401')) {
+        this.#showAuthGate()
+        return
+      }
       if (err.message === 'AUTH_FAILED') {
         this.#config.clear()
         /** @type {HTMLElement} */
@@ -423,12 +459,79 @@ class App {
   }
 
   #showHero() {
+    const authGate = $('#auth-gate')
+    if (authGate) authGate.hidden = true
     $('#hero').hidden = false
     $('#app').hidden = true
   }
 
   #hideHero() {
     $('#hero').hidden = true
+    const authGate = $('#auth-gate')
+    if (authGate) authGate.hidden = true
+  }
+
+  /** @param {string | null} [messageKey] */
+  #showAuthGate(messageKey = null) {
+    $('#hero').hidden = true
+    $('#app').hidden = true
+    $('#auth-gate').hidden = false
+
+    const error = $('#auth-error')
+    error.hidden = !messageKey
+    error.textContent = messageKey ? t(/** @type {any} */ (messageKey)) : ''
+
+    const input = /** @type {HTMLInputElement} */ ($('#auth-password'))
+    input.value = ''
+    input.focus()
+  }
+
+  #bindAuthEvents() {
+    const form = /** @type {HTMLFormElement | null} */ ($('#auth-form'))
+    if (!form) return
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const input = /** @type {HTMLInputElement} */ ($('#auth-password'))
+      const button = /** @type {HTMLButtonElement} */ ($('#auth-submit'))
+      const error = $('#auth-error')
+      const password = input.value.trim()
+      if (!password) return
+
+      button.disabled = true
+      error.hidden = true
+      try {
+        if (!(await this.#session.login(password))) {
+          error.textContent = t('authInvalid')
+          error.hidden = false
+          input.select()
+          return
+        }
+        this.#config.applySession(/** @type {import('./config-manager.js').SessionInfo} */ (this.#session.info))
+        this.#applyWorkerMode()
+        $('#auth-gate').hidden = true
+        await this.#connectAndLoad()
+      } catch {
+        error.textContent = t('authUnavailable')
+        error.hidden = false
+      } finally {
+        button.disabled = false
+      }
+    })
+  }
+
+  #applyWorkerMode() {
+    const shareBtn = $('#share-btn')
+    if (shareBtn) shareBtn.hidden = true
+    const note = $('#r2-managed-note')
+    if (note) note.hidden = false
+
+    for (const selector of ['#cfg-account-id', '#cfg-access-key', '#cfg-secret-key']) {
+      const field = $(selector).closest('.field')
+      if (field) /** @type {HTMLElement} */ (field).hidden = true
+    }
+    const bucket = /** @type {HTMLInputElement} */ ($('#cfg-bucket'))
+    bucket.readOnly = true
   }
 
   #bindHeroEvents() {
@@ -617,8 +720,18 @@ class App {
     $('#settings-btn').addEventListener('click', () => this.#showConfigDialog())
 
     $('#logout-btn').addEventListener('click', async () => {
-      const ok = await this.#ui.confirm(t('logoutConfirmTitle'), t('logoutConfirmMsg'))
+      const managed = this.#session.isWorkerMode()
+      const ok = await this.#ui.confirm(t('logoutConfirmTitle'), t(managed ? 'logoutWorkerMsg' : 'logoutConfirmMsg'))
       if (!ok) return
+
+      if (managed) {
+        await this.#session.logout()
+        this.#config.clearSession()
+        $('#app').hidden = true
+        this.#showAuthGate()
+        return
+      }
+
       this.#config.clear()
       $('#app').hidden = true
       this.#showHero()

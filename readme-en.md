@@ -10,7 +10,7 @@
 
 ## Live Demo
 
-Follow the [Quick Start](#quick-start) to configure R2 CORS, then open **[r2.viki.moe](https://r2.viki.moe)**. Credentials stay in your browser.
+Follow the [Quick Start](#quick-start) to configure R2 CORS, then open **[r2.viki.moe](https://r2.viki.moe)**. Credentials stay in your browser by default; the bundled Worker can hold them instead — see [Worker deployment](#worker-deployment-optional-server-held-credentials--access-control).
 
 ## Why R2 Web?
 
@@ -85,6 +85,61 @@ R2 Web is a static site. Deploy the repository's `src` directory as-is.
 | Cloudflare Pages | [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)][cloudflare-deploy] |
 
 After deployment, add the new domain to your R2 CORS `AllowedOrigins`.
+
+## Worker Deployment (optional: server-held credentials + access control)
+
+A static deployment asks every visitor for R2 credentials. The bundled Cloudflare Worker keeps them on the server and hands the browser **1-hour temporary credentials** (R2 temporary credentials, signed locally as a JWT), so visitors only need one access token.
+
+- Browsers keep talking to R2 directly: uploads, listings and deletes never pass through the Worker, so 1 TiB multipart uploads are unaffected.
+- Visitors enter through `https://your-domain/?token=xxx` (traded for an HttpOnly cookie, token stripped from the URL) or by typing the same token on the access screen. Sessions last 7 days by default; rotating the token invalidates every session.
+- Previews and downloads are streamed through the Worker (Range supported), because `<video>` and `<img>` cannot send signature headers.
+- Static deployments are untouched: when `/api/session` does not answer with JSON, the app falls back to local credentials.
+
+### 1. Create an R2 API token
+
+Use the **Object Read & Write** permission, scoped to the target bucket.
+
+### 2. Fill in `wrangler.worker.jsonc`
+
+The Worker variant has its own config so `wrangler.jsonc` stays a plain static deployment (the one-click deploy button keeps using it):
+
+```jsonc
+{
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "your-bucket" }],
+  "vars": {
+    "R2_ACCOUNT_ID": "your-account-id",
+    "R2_BUCKET": "your-bucket",
+    "R2_CUSTOM_DOMAIN": ""
+  }
+}
+```
+
+### 3. Set secrets and deploy
+
+```bash
+openssl rand -hex 24   # generate the access token, avoid weak passwords
+
+npx wrangler secret put ACCESS_TOKEN -c wrangler.worker.jsonc
+npx wrangler secret put R2_ACCESS_KEY_ID -c wrangler.worker.jsonc
+npx wrangler secret put R2_SECRET_ACCESS_KEY -c wrangler.worker.jsonc
+npx wrangler deploy -c wrangler.worker.jsonc
+```
+
+Add the Worker domain to your R2 CORS `AllowedOrigins`. `AllowedHeaders` must be `*` so the new `X-Amz-Security-Token` header passes; keep `ETag` in `ExposeHeaders`.
+
+### 4. Share
+
+Send `https://your-domain/?token=<ACCESS_TOKEN>`, or just the domain and let people type the token. Optionally run `npx wrangler secret put SESSION_SECRET -c wrangler.worker.jsonc` to sign cookies with a key separate from the access token; rotating it also signs everyone out.
+
+> [!NOTE]
+> Everyone shares that one token, so everyone is an admin. Per-prefix, read-only and expiring share links are the next step — R2 temporary credentials already support `prefixPaths` and `actions`.
+
+Local development:
+
+```bash
+cp .dev.vars.example .dev.vars   # fill in the same values
+npx wrangler dev -c wrangler.worker.jsonc
+```
 
 ## Common Configuration
 

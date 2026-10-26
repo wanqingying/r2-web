@@ -1,0 +1,20 @@
+# Local development values for `wrangler dev`.
+# Copy to `.dev.vars` and fill in; never commit the real values.
+
+R2_ACCOUNT_ID=your-account-id
+R2_BUCKET=your-bucket
+R2_ACCESS_KEY_ID=your-access-key-id
+R2_SECRET_ACCESS_KEY=your-secret-access-key
+
+# The one secret visitors use, as a `?token=` link or as a password.
+# Generate with: openssl rand -hex 24
+ACCESS_TOKEN=replace-with-a-long-random-string
+
+# Optional: rotating this invalidates every session cookie.
+# SESSION_SECRET=
+
+# Optional: temporary credential lifetime in seconds (default 3600).
+# CREDENTIAL_TTL=3600
+
+# Optional: session cookie lifetime in seconds (default 604800 = 7 days).
+# SESSION_TTL=604800

@@ -28,6 +28,7 @@ python3 -m http.server 5500 --directory src
 | 修改按钮样式       | `src/css/components.css` — `.btn`                                           |
 | 添加设计 Token     | `src/css/tokens.css`                                                        |
 | 修改 R2 API 操作   | `src/js/r2-client.js`                                                       |
+| 修改 Worker 鉴权   | `worker/index.js`（凭据托管、token/密码、对象代理）                         |
 | 修改文件浏览逻辑   | `src/js/file-explorer.js`                                                   |
 | 修改上传管理逻辑   | `src/js/upload-manager.js`                                                  |
 | 多选批量操作逻辑   | `src/js/file-explorer.js` — `toggleSelect` / `selectAll` / `clearSelection` |
@@ -49,6 +50,10 @@ r2-web/
 ├── readme.md          — 项目说明、使用指南
 ├── package.json       — 依赖声明（仅用于类型提示）
 ├── jsconfig.json      — JSDoc 类型检查配置
+├── wrangler.jsonc     — 静态部署配置（一键部署按钮使用）
+├── wrangler.worker.jsonc — Worker 部署配置（凭据托管，用 -c 指定）
+├── worker/
+│    └── index.js      — Worker：会话、临时凭据签发、对象代理
 └── src/               — 源码目录（即部署目录）
      ├── index.html    — 应用外壳、import map、对话框模板
      ├── main.js       — 入口（仅 new App()）
@@ -85,6 +90,7 @@ r2-web/
 | 类               | 文件                 | 职责                                         |
 | ---------------- | -------------------- | -------------------------------------------- |
 | `ConfigManager`  | `config-manager.js`  | localStorage 持久化、Base64 配置分享         |
+| `SessionManager` | `session.js`         | Worker 模式探测、登录、临时凭据续签          |
 | `R2Client`       | `r2-client.js`       | S3 API 客户端（基于 `aws4fetch` 签名）       |
 | `UIManager`      | `ui-manager.js`      | 主题、Toast、对话框、上下文菜单、Tooltip     |
 | `FileExplorer`   | `file-explorer.js`   | 目录导航、排序、分页、懒加载缩略图、列表缓存 |

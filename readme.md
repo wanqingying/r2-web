@@ -12,7 +12,7 @@
 
 ## 在线使用
 
-按 [快速开始](#快速开始) 配置 R2 CORS，然后访问 **[r2.viki.moe](https://r2.viki.moe)**。凭证只保存在浏览器本地。
+按 [快速开始](#快速开始) 配置 R2 CORS，然后访问 **[r2.viki.moe](https://r2.viki.moe)**。默认凭证只保存在浏览器本地；也可以用自带的 Worker 托管凭证，见 [Worker 部署](#worker-部署可选凭据托管--访问控制)。
 
 ## 为什么做 R2 Web？
 
@@ -22,7 +22,7 @@ Cloudflare 控制台适合基础操作，但大量文件的浏览、移动、重
 
 | 优势 | 说明 |
 | --- | --- |
-| **纯客户端直连** | 浏览器直接调用 R2 S3 API，没有中转服务器，文件和凭证不经过第三方后端 |
+| **纯客户端直连** | 浏览器直接调用 R2 S3 API，没有中转服务器，文件和凭证不经过第三方后端（也可选 Worker 托管凭证） |
 | **零构建、零框架** | `src` 即部署产物，基于原生 Web API，便于审计、修改和私有部署 |
 | **大文件体验** | 自动分片，支持暂停/继续、实时速度和大小进度，最大支持 1 TiB |
 | **专注文件管理** | 目录浏览、预览、排序、批量选择，以及复制、移动、重命名、递归删除 |
@@ -87,6 +87,62 @@ R2 Web 是静态站点，部署仓库中的 `src` 目录即可。
 | Cloudflare Pages | [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)][cloudflare-deploy] |
 
 部署完成后，请将新域名加入 R2 CORS 的 `AllowedOrigins`。
+
+## Worker 部署（可选：凭据托管 + 访问控制）
+
+静态部署需要每个访客自己填写 R2 凭据。如果希望凭据留在服务端、访客只验证一个 token，可以用仓库自带的 Cloudflare Worker 版本：
+
+- Worker 持有 R2 API Token，每次访问签发 **1 小时临时凭据**（R2 temporary credentials，本地 JWT 签名）。浏览器继续直连 R2，上传、列表、删除不经过 Worker，1 TiB 分片上传不受影响。
+- 访客有两种进入方式：打开 `https://你的域名/?token=xxx`（自动换成 HttpOnly cookie，并把 token 从地址栏抹掉），或者直接打开站点后输入同一个 token。默认 7 天免登录，更换 token 会让所有会话立即失效。
+- 预览与下载由 Worker 流式转发（支持 Range），因为 `<video>` / `<img>` 无法携带签名头。
+- 静态部署（Vercel / Netlify / Pages）不受影响：探测不到 `/api/session` 时自动回到本地凭据模式。
+
+### 1. 创建 R2 API Token
+
+权限选 **Object Read & Write**，范围限定到目标 bucket。
+
+### 2. 填写 `wrangler.worker.jsonc`
+
+Worker 版单独一个配置文件，`wrangler.jsonc` 保持纯静态部署（一键部署按钮仍走它）。把桶名和 Account ID 填进去：
+
+```jsonc
+{
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "你的桶名" }],
+  "vars": {
+    "R2_ACCOUNT_ID": "你的 Account ID",
+    "R2_BUCKET": "你的桶名",
+    "R2_CUSTOM_DOMAIN": ""
+  }
+}
+```
+
+### 3. 写入密钥并部署
+
+```bash
+# 生成访问 token，别用弱口令
+openssl rand -hex 24
+
+npx wrangler secret put ACCESS_TOKEN -c wrangler.worker.jsonc
+npx wrangler secret put R2_ACCESS_KEY_ID -c wrangler.worker.jsonc
+npx wrangler secret put R2_SECRET_ACCESS_KEY -c wrangler.worker.jsonc
+npx wrangler deploy -c wrangler.worker.jsonc
+```
+
+把 Worker 域名加入 R2 CORS 的 `AllowedOrigins`。`AllowedHeaders` 需要是 `*`，用于放行新增的 `X-Amz-Security-Token`；`ExposeHeaders` 保持包含 `ETag`。
+
+### 4. 分享
+
+把 `https://你的域名/?token=<ACCESS_TOKEN>` 发给对方即可，也可以只发域名、让对方输入这个 token。可选：`npx wrangler secret put SESSION_SECRET -c wrangler.worker.jsonc`，让 cookie 的签名密钥与访问 token 分离；更换它同样会让所有会话失效。
+
+> [!NOTE]
+> 所有访客共享同一个 token，等同于共享管理员权限。按目录、只读、带有效期的分享链接是后续计划——R2 临时凭据原生支持 `prefixPaths` 与 `actions` 限定。
+
+本地调试：
+
+```bash
+cp .dev.vars.example .dev.vars   # 填入同一组配置
+npx wrangler dev -c wrangler.worker.jsonc
+```
 
 ## 常用配置
 

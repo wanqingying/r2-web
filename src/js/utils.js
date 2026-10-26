@@ -36,7 +36,7 @@ function getFileType(key) {
   return 'file'
 }
 
-/** @typedef {'http401Error' | 'http403Error' | 'http404Error' | 'corsError' | 'networkError'} ErrorMessageKey */
+/** @typedef {'http401Error' | 'http403Error' | 'http404Error' | 'corsError' | 'networkError' | 'authFailed'} ErrorMessageKey */
 
 /**
  * Get user-friendly error message based on error type
@@ -48,6 +48,7 @@ function getErrorMessage(err) {
   if (msg === 'HTTP_401') return 'http401Error'
   if (msg === 'HTTP_403') return 'http403Error'
   if (msg === 'HTTP_404') return 'http404Error'
+  if (msg === 'SESSION_EXPIRED') return 'authFailed'
   if (err instanceof TypeError && msg.includes('Failed to fetch')) {
     return 'corsError'
   }
