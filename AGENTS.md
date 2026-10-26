@@ -50,8 +50,7 @@ r2-web/
 ├── readme.md          — 项目说明、使用指南
 ├── package.json       — 依赖声明（仅用于类型提示）
 ├── jsconfig.json      — JSDoc 类型检查配置
-├── wrangler.jsonc     — 静态部署配置（一键部署按钮使用）
-├── wrangler.worker.jsonc — Worker 部署配置（凭据托管，用 -c 指定）
+├── wrangler.jsonc     — 部署配置（Worker + 静态资源 + R2 绑定）
 ├── worker/
 │    └── index.js      — Worker：会话、临时凭据签发、对象代理
 └── src/               — 源码目录（即部署目录）

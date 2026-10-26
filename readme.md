@@ -101,9 +101,9 @@ R2 Web 是静态站点，部署仓库中的 `src` 目录即可。
 
 权限选 **Object Read & Write**，范围限定到目标 bucket。
 
-### 2. 填写 `wrangler.worker.jsonc`
+### 2. 填写 `wrangler.jsonc`
 
-Worker 版单独一个配置文件，`wrangler.jsonc` 保持纯静态部署（一键部署按钮仍走它）。把桶名和 Account ID 填进去：
+Worker 部署与静态部署共用这一份配置：`main` 指向 Worker，`assets` 指向静态资源，R2 绑定和变量也在里面。把桶名和 Account ID 填进去（Git 集成部署时构建会直接读这个文件）：
 
 ```jsonc
 {
@@ -122,17 +122,17 @@ Worker 版单独一个配置文件，`wrangler.jsonc` 保持纯静态部署（�
 # 生成访问 token，别用弱口令
 openssl rand -hex 24
 
-npx wrangler secret put ACCESS_TOKEN -c wrangler.worker.jsonc
-npx wrangler secret put R2_ACCESS_KEY_ID -c wrangler.worker.jsonc
-npx wrangler secret put R2_SECRET_ACCESS_KEY -c wrangler.worker.jsonc
-npx wrangler deploy -c wrangler.worker.jsonc
+npx wrangler secret put ACCESS_TOKEN
+npx wrangler secret put R2_ACCESS_KEY_ID
+npx wrangler secret put R2_SECRET_ACCESS_KEY
+npx wrangler deploy
 ```
 
 把 Worker 域名加入 R2 CORS 的 `AllowedOrigins`。`AllowedHeaders` 需要是 `*`，用于放行新增的 `X-Amz-Security-Token`；`ExposeHeaders` 保持包含 `ETag`。
 
 ### 4. 分享
 
-把 `https://你的域名/?token=<ACCESS_TOKEN>` 发给对方即可，也可以只发域名、让对方输入这个 token。可选：`npx wrangler secret put SESSION_SECRET -c wrangler.worker.jsonc`，让 cookie 的签名密钥与访问 token 分离；更换它同样会让所有会话失效。
+把 `https://你的域名/?token=<ACCESS_TOKEN>` 发给对方即可，也可以只发域名、让对方输入这个 token。可选：`npx wrangler secret put SESSION_SECRET`，让 cookie 的签名密钥与访问 token 分离；更换它同样会让所有会话失效。
 
 > [!NOTE]
 > 所有访客共享同一个 token，等同于共享管理员权限。按目录、只读、带有效期的分享链接是后续计划——R2 临时凭据原生支持 `prefixPaths` 与 `actions` 限定。
@@ -141,7 +141,7 @@ npx wrangler deploy -c wrangler.worker.jsonc
 
 ```bash
 cp .dev.vars.example .dev.vars   # 填入同一组配置
-npx wrangler dev -c wrangler.worker.jsonc
+npx wrangler dev
 ```
 
 ## 常用配置

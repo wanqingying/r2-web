@@ -99,9 +99,9 @@ A static deployment asks every visitor for R2 credentials. The bundled Cloudflar
 
 Use the **Object Read & Write** permission, scoped to the target bucket.
 
-### 2. Fill in `wrangler.worker.jsonc`
+### 2. Fill in `wrangler.jsonc`
 
-The Worker variant has its own config so `wrangler.jsonc` stays a plain static deployment (the one-click deploy button keeps using it):
+Static and Worker deployments share this single config: `main` points at the Worker, `assets` at the static files, and the R2 binding and variables live here too. Fill in your bucket and Account ID (the Git integration reads this file on every build):
 
 ```jsonc
 {
@@ -119,17 +119,17 @@ The Worker variant has its own config so `wrangler.jsonc` stays a plain static d
 ```bash
 openssl rand -hex 24   # generate the access token, avoid weak passwords
 
-npx wrangler secret put ACCESS_TOKEN -c wrangler.worker.jsonc
-npx wrangler secret put R2_ACCESS_KEY_ID -c wrangler.worker.jsonc
-npx wrangler secret put R2_SECRET_ACCESS_KEY -c wrangler.worker.jsonc
-npx wrangler deploy -c wrangler.worker.jsonc
+npx wrangler secret put ACCESS_TOKEN
+npx wrangler secret put R2_ACCESS_KEY_ID
+npx wrangler secret put R2_SECRET_ACCESS_KEY
+npx wrangler deploy
 ```
 
 Add the Worker domain to your R2 CORS `AllowedOrigins`. `AllowedHeaders` must be `*` so the new `X-Amz-Security-Token` header passes; keep `ETag` in `ExposeHeaders`.
 
 ### 4. Share
 
-Send `https://your-domain/?token=<ACCESS_TOKEN>`, or just the domain and let people type the token. Optionally run `npx wrangler secret put SESSION_SECRET -c wrangler.worker.jsonc` to sign cookies with a key separate from the access token; rotating it also signs everyone out.
+Send `https://your-domain/?token=<ACCESS_TOKEN>`, or just the domain and let people type the token. Optionally run `npx wrangler secret put SESSION_SECRET` to sign cookies with a key separate from the access token; rotating it also signs everyone out.
 
 > [!NOTE]
 > Everyone shares that one token, so everyone is an admin. Per-prefix, read-only and expiring share links are the next step — R2 temporary credentials already support `prefixPaths` and `actions`.
@@ -138,7 +138,7 @@ Local development:
 
 ```bash
 cp .dev.vars.example .dev.vars   # fill in the same values
-npx wrangler dev -c wrangler.worker.jsonc
+npx wrangler dev
 ```
 
 ## Common Configuration

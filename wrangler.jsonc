@@ -1,7 +1,21 @@
 {
   "name": "r2-web",
+  "main": "worker/index.js",
   "compatibility_date": "2026-02-11",
   "assets": {
-    "directory": "./src"
+    "directory": "./src",
+    "binding": "ASSETS",
+    "run_worker_first": ["/", "/index.html", "/api/*"]
+  },
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "personal"
+    }
+  ],
+  "vars": {
+    "R2_ACCOUNT_ID": "12fe5338781939c4d1929577bb948f4f",
+    "R2_BUCKET": "personal",
+    "R2_CUSTOM_DOMAIN": ""
   }
 }
